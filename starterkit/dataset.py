@@ -120,9 +120,9 @@ class Drive360(object):
             # If challenge participants have a greater temporal length than 10s for each training sample, then they
             # must write a custom function here.
 
-            self.indices = self.dataframe.groupby('chapter').apply(
-                lambda x: x.iloc[100:]).index.droplevel(
-                level=0).tolist()
+            # self.indices = self.dataframe.groupby('chapter').apply(
+            #     lambda x: x.iloc[100:]).index.droplevel(
+            #     level=0).tolist()
             if 'canSteering' not in self.dataframe.columns:
                 self.dataframe['canSteering'] = [0.0 for _ in range(len(self.dataframe))]
             if 'canSpeed' not in self.dataframe.columns:
@@ -190,10 +190,17 @@ class Drive360(object):
         if self.front:
             inputs['cameraFront'] = {}
             for row_idx, (_, row) in enumerate(rows.iterrows()):
-                inputs['cameraFront'][row_idx] = (self.imageFront_transform(Image.open(self.data_dir + row['cameraFront'])))
+                inputs['cameraFront'][row_idx] = \
+                    (self.imageFront_transform(Image.open(self.data_dir + row['cameraFront'])))
         if self.right_left:
-            inputs['cameraRight'] = self.imageSides_transform(Image.open(self.data_dir + rows['cameraRight'].iloc[0]))
-            inputs['cameraLeft'] = self.imageSides_transform(Image.open(self.data_dir + rows['cameraLeft'].iloc[0]))
+            inputs['cameraRight'] = {}
+            for row_idx, (_, row) in enumerate(rows.iterrows()):
+                inputs['cameraRight'][row_idx] = \
+                    (self.imageSides_transform(Image.open(self.data_dir + row['cameraRight'])))
+            inputs['cameraLeft'] = {}
+            for row_idx, (_, row) in enumerate(rows.iterrows()):
+                inputs['cameraLeft'][row_idx] = \
+                    (self.imageSides_transform(Image.open(self.data_dir + row['cameraLeft'])))
         if self.rear:
             inputs['cameraRear'] = self.imageSides_transform(Image.open(self.data_dir + rows['cameraRear'].iloc[0]))
         labels['canSteering'] = self.dataframe['canSteering'].iloc[index]
