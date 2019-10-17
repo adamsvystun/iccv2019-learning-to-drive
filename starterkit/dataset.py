@@ -1,11 +1,11 @@
 import os
-from PIL import Image
-import pandas as pd
-import numpy as np
 from random import shuffle
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+from torch.utils.data import DataLoader, Sampler, Dataset
 from torchvision import transforms
-from torch.utils.data import DataLoader
-from torch.utils.data import Sampler
 
 
 class SubsetSampler(Sampler):
@@ -28,21 +28,22 @@ class SubsetSampler(Sampler):
 class Drive360Loader(DataLoader):
 
     def __init__(self, config, phase):
-
         self.drive360 = Drive360(config, phase)
         batch_size = config['data_loader'][phase]['batch_size']
         sampler = SubsetSampler(self.drive360.indices)
         num_workers = config['data_loader'][phase]['num_workers']
 
-        super().__init__(dataset=self.drive360,
-                         batch_size=batch_size,
-                         sampler=sampler,
-                         num_workers=num_workers
-                         )
+        super().__init__(
+            dataset=self.drive360,
+            batch_size=batch_size,
+            sampler=sampler,
+            num_workers=num_workers
+        )
 
-class Drive360(object):
-    ## takes a config json object that specifies training parameters and a
-    ## phase (string) to specifiy either 'train', 'test', 'validation'
+
+class Drive360(Dataset):
+    # takes a config json object that specifies training parameters and a
+    # phase (string) to specify either 'train', 'test', 'validation'
     def __init__(self, config, phase):
         self.config = config
         self.data_dir = config['data_loader']['data_dir']
@@ -64,18 +65,22 @@ class Drive360(object):
         self.right_left = config['multi_camera']['right_left']
         self.rear = config['multi_camera']['rear']
 
-        #### reading in dataframe from csv #####
-        self.dataframe = pd.read_csv(os.path.join(self.data_dir, self.csv_name),
-                                     dtype={'cameraFront': object,
-                                            'cameraRear': object,
-                                            'cameraRight': object,
-                                            'cameraLeft': object,
-                                            'canSpeed': np.float32,
-                                            'canSteering': np.float32
-                                            })
+        # reading in dataframe from csv
+        self.dataframe = pd.read_csv(
+            os.path.join(self.data_dir, self.csv_name),
+            dtype={
+                'cameraFront': object,
+                'cameraRear': object,
+                'cameraRight': object,
+                'cameraLeft': object,
+                'canSpeed': np.float32,
+                'canSteering': np.float32
+            }
+        )
 
         # Here we calculate the temporal offset for the starting indices of each chapter. As we cannot cross chapter
-        # boundaries but would still like to obtain a temporal sequence of images, we cannot start at index 0 of each chapter
+        # boundaries but would still like to obtain a temporal sequence of images, we cannot start at index 0 of each
+        # chapter
         # but rather at some index i such that the i-max_temporal_history = 0
         # To explain see the diagram below:
         #
@@ -92,16 +97,17 @@ class Drive360(object):
         # Thus the fifth sample will consist of images:     [-****]
         # Thus the sixth sample will consist of images:     [*****]
 
-        self.sequence_length = self.history_number*self.history_frequency
+        self.sequence_length = self.history_number * self.history_frequency
         max_temporal_history = self.sequence_length
-        self.indices = self.dataframe.groupby('chapter').apply(lambda x: x.iloc[max_temporal_history:]).index.droplevel(level=0).tolist()
+        self.indices = self.dataframe.groupby('chapter').apply(lambda x: x.iloc[max_temporal_history:]).index.droplevel(
+            level=0).tolist()
 
-        #### phase specific manipulation #####
+        # phase specific manipulation #
         if phase == 'train':
             self.dataframe['canSteering'] = np.clip(self.dataframe['canSteering'], a_max=360, a_min=-360)
 
-            ##### If you want to use binning on angle #####
-            ## START ##
+            # If you want to use binning on angle #
+            # START #
             # self.dataframe['bin_canSteering'] = pd.cut(self.dataframe['canSteering'],
             #                                            bins=[-360, -20, 20, 360],
             #                                            labels=['left', 'straight', 'right'])
@@ -109,7 +115,7 @@ class Drive360(object):
             # min_group = min(gp.apply(lambda x: len(x)))
             # bin_indices = gp.apply(lambda x: x.sample(n=min_group)).index.droplevel(level=0).tolist()
             # self.indices = list(set(self.indices) & set(bin_indices))
-            ## END ##
+            # END #
 
         elif phase == 'validation':
             self.dataframe['canSteering'] = np.clip(self.dataframe['canSteering'], a_max=360, a_min=-360)
@@ -128,17 +134,14 @@ class Drive360(object):
             if 'canSpeed' not in self.dataframe.columns:
                 self.dataframe['canSpeed'] = [0.0 for _ in range(len(self.dataframe))]
 
-
         if self.normalize_targets and not phase == 'test':
             self.dataframe['canSteering'] = (self.dataframe['canSteering'].values -
-                                            self.target_mean['canSteering']) / self.target_std['canSteering']
+                                             self.target_mean['canSteering']) / self.target_std['canSteering']
             self.dataframe['canSpeed'] = (self.dataframe['canSpeed'].values -
-                                            self.target_mean['canSpeed']) / self.target_std['canSpeed']
+                                          self.target_mean['canSpeed']) / self.target_std['canSpeed']
 
         if self.shuffle:
             shuffle(self.indices)
-
-
 
         print('Phase:', phase, '# of data:', len(self.indices))
 
@@ -179,7 +182,6 @@ class Drive360(object):
         self.imageFront_transform = front_transforms[phase]
         self.imageSides_transform = sides_transforms[phase]
 
-
     def __getitem__(self, index):
         inputs = {}
         labels = {}
@@ -208,3 +210,18 @@ class Drive360(object):
 
         return inputs, labels
 
+
+def test():
+    import json
+    config = json.load(open('./config.json'))
+    loader = Drive360Loader(config, 'validation')
+    print('Loaded val loader with the following data available as a dict.')
+    print(loader.drive360.dataframe.keys())
+    for i, batch in enumerate(loader):
+        print(i, len(batch), batch[0].keys(), batch[0]['cameraFront'].keys())
+        if i > 1:
+            break
+
+
+if __name__ == '__main__':
+    test()
