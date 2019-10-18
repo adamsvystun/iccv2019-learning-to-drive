@@ -33,7 +33,7 @@ def interpolate(
     interpolated_submissions = []
     sequence_length = frequency * number
     # Calculate the initial offset of the first predicted frame under given configuration
-    initial_offset = sample_frequency * sequence_length
+    initial_offset = sample_frequency * (sequence_length + 1)
     # For each chapter
     for chapter in original_dataset_descriptor.chapter.unique():
         # Get chapters
@@ -42,10 +42,10 @@ def interpolate(
         sampled_chapter = sampled_dataset_descriptor[sampled_dataset_descriptor.chapter == chapter]
         sampled_chapter_len = len(sampled_chapter.index)
         # Get relevant submission cut
-        submission_cut = submission.head(sampled_chapter_len - sequence_length + 1)
+        submission_cut = submission.head(sampled_chapter_len - sequence_length)
         submission = submission.drop(submission_cut.index)
         # Interpolation submission cut
-        old_indices = list(range(initial_offset, (len(submission_cut.index) + sequence_length) * sample_frequency, sample_frequency))
+        old_indices = list(range(initial_offset, (len(submission_cut.index) + sequence_length + 1) * sample_frequency, sample_frequency))
         submission_cut = submission_cut.set_index(pd.Index(old_indices))
         new_indices = range(0, original_chapter_len)
         # Start from 100s frame in the test data
