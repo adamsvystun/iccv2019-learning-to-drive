@@ -74,7 +74,7 @@ def create_submission(options) -> None:
         sampled_dataset_descriptor,
         sample_frequency,
         options.frequency,
-        options.number
+        options.sequence_frame_number
     )
     save_submission(submission, options.output_path)
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         help='With what frequency the dataset has been loaded for test prediction'
     )
     parser.add_argument(
-        '--number', '-n', type=int, required=True,
+        '--sequence-frame-number', '-sfn', type=int, required=True,
         help='What number of previous frames has been loaded for test prediction'
     )
 
